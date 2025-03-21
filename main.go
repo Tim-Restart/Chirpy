@@ -25,7 +25,7 @@ func (cfg *apiConfig) metricsHandler(w http.ResponseWriter, r *http.Request) {
 	htmlTemplate := `<html>
 	<body>
 		<h1>Welcome, Chirpy Admin</h1>
-		<p>Chirpy has been visited <b>%d</b> times!</p>
+		<p>Chirpy has been visited %d times!</p>
 	</body>
 	</html>`
 
