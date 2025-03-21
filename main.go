@@ -15,21 +15,25 @@ func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 		cfg.fileserverHits.Add(1)
 		// pass next to ServerHTTP
 		next.ServeHTTP(w, r)
-	}
+	})
 }
 
 func (cfg *apiConfig) metricsHandler(w http.ResponseWriter, r *http.Request) {
 	counter := cfg.fileserverHits.Load()
-	w.Write([]byte(fmt.Sprintf("Hits: %d", counter)))
+	w.Write([]byte(fmt.Sprintf("Hits: %d\n", counter)))
 }
 
 func (cfg *apiConfig) metricsResetHandler(w http.ResponseWriter, r *http.Request) {
 	cfg.fileserverHits.Store(0)
-	w.Write([]byte("Counter Reset"))
+	w.Write([]byte("Counter Reset\n"))
 }
 
 
 func main() {
+
+	// Create an instance of apiConfig
+	cfg := apiConfig{}
+
 	// Make a new server
 	mux := http.NewServeMux()
 
@@ -38,13 +42,13 @@ func main() {
 
 	// Register paths and their handlers
 	// FileServer is in http package, Dir converts the '.' to a directory part
-	mux.Handle("/app/", middlewareMetricsInc(http.StripPrefix("/app", fileHandler)))
+	mux.Handle("/app/", cfg.middlewareMetricsInc(http.StripPrefix("/app", fileHandler)))
 
 	// returns the server metrics
-	mux.HandleFunc("/metrics", apiConfig.metricsHandler)
+	mux.HandleFunc("/metrics", cfg.metricsHandler)
 
 	// Resets the server metrics
-	mux.HandleFunc("/reset", apiConfig.metricsResetHandler)
+	mux.HandleFunc("/reset", cfg.metricsResetHandler)
 
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 	// Set the content type header
@@ -54,7 +58,7 @@ func main() {
 	w.WriteHeader(http.StatusOK)
 
 	// Write the response body
-	w.Write([]byte("OK"))
+	w.Write([]byte("OK\n"))
 
 	})
 
