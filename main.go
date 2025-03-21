@@ -20,7 +20,23 @@ func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 
 func (cfg *apiConfig) metricsHandler(w http.ResponseWriter, r *http.Request) {
 	counter := cfg.fileserverHits.Load()
-	w.Write([]byte(fmt.Sprintf("Hits: %d\n", counter)))
+
+	//HTML template for admin page
+	htmlTemplate := `<html>
+	<body>
+		<h1>Welcome, Chirpy Admin</h1>
+		<p>Chirpy has been visited %d times!</p>
+	</body>
+	</html>`
+
+	// Format the above template with the counter in the %d spot
+	htmlContent := fmt.Sprintf(htmlTemplate, counter)
+
+	// Sets the header type to HTML
+	w.Header().Set("Content-Type", "text/html")
+	
+	// Write the html to the response
+	fmt.Fprint(w, htmlContent)
 }
 
 func (cfg *apiConfig) metricsResetHandler(w http.ResponseWriter, r *http.Request) {
@@ -45,12 +61,12 @@ func main() {
 	mux.Handle("/app/", cfg.middlewareMetricsInc(http.StripPrefix("/app", fileHandler)))
 
 	// returns the server metrics
-	mux.HandleFunc("/metrics", cfg.metricsHandler)
+	mux.HandleFunc("GET /admin/metrics", cfg.metricsHandler)
 
 	// Resets the server metrics
-	mux.HandleFunc("/reset", cfg.metricsResetHandler)
+	mux.HandleFunc("POST /admin/reset", cfg.metricsResetHandler)
 
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
 	// Set the content type header
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
