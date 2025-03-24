@@ -3,13 +3,15 @@ package main
 import "net/http"
 import "sync/atomic"
 import "fmt"
+import "github.com/Tim-Restart/chirpy/internal/database"
 
 
-type apiConfig struct {
+type ApiConfig struct {
 	fileserverHits atomic.Int32
+	DBQueries *database.Queries
 }
 
-func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
+func (cfg *ApiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 	// Increments the fileserverHits
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Increment the counter using atomic32 add
@@ -19,7 +21,7 @@ func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 	})
 }
 
-func (cfg *apiConfig) metricsHandler(w http.ResponseWriter, r *http.Request) {
+func (cfg *ApiConfig) metricsHandler(w http.ResponseWriter, r *http.Request) {
 	counter := cfg.fileserverHits.Load()
 
 	//HTML template for admin page
@@ -40,7 +42,7 @@ func (cfg *apiConfig) metricsHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, htmlContent)
 }
 
-func (cfg *apiConfig) metricsResetHandler(w http.ResponseWriter, r *http.Request) {
+func (cfg *ApiConfig) metricsResetHandler(w http.ResponseWriter, r *http.Request) {
 	cfg.fileserverHits.Store(0)
 	w.Write([]byte("Counter Reset\n"))
 }

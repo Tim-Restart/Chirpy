@@ -3,14 +3,52 @@ package main
 import "net/http"
 import "encoding/json"
 import "log"
+import _ "github.com/lib/pq"
+import "os"
+import "database/sql"
+import "github.com/joho/godotenv" 
+import "github.com/Tim-Restart/chirpy/internal/database"
+import "fmt"
 
 
 
 
 func main() {
 
+	// The first section of code below sets the URL by loading the .env file, then connects all SQL stuff, then stores it in a struct.
+
+	// Load the .env file, panic if it doesn't work
+	err := godotenv.Load()
+	if err != nil {
+		panic("Error loading .env files")
+	}
+
+	// set the dbURL to the path for the sql database from the .env file
+	dbURL := os.Getenv("DB_URL")
+	if dbURL == "" {
+		panic("DB_URL is not set in the enviroment, check .env file")
+	}
+
+	// Open the SQL database connection
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		panic(err)
+	}
+
+	// Create a new instance of *database.Queries
+	dbQueries := database.New(db)
+
+	// Store it in the apiConfig struct so we have access anywhere
+	apiConfig := ApiConfig{
+		DBQueries: dbQueries,
+	}
+
+	fmt.Printf("apiConfig initialized: %+v\n", apiConfig)
+
+	
+
 	// Create an instance of apiConfig
-	cfg := apiConfig{}
+	cfg := ApiConfig{}
 
 	// Make a new server
 	mux := http.NewServeMux()
