@@ -149,6 +149,9 @@ func main() {
 
 	// mux.HandleFunc()
 
+	// Adds a new user to the database
+	mux.HandleFunc("POST /api/users", cfg.addUser)
+
 	// returns the server metrics
 	mux.HandleFunc("GET /admin/metrics", cfg.metricsHandler)
 
@@ -173,7 +176,7 @@ func main() {
 		Handler: mux,
 	}
 
-
+	fmt.Println("Ready to serve my lord")
 	// Start the server
 	server.ListenAndServe()
 	
