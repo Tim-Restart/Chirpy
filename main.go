@@ -6,17 +6,42 @@ import "log"
 import _ "github.com/lib/pq"
 import "os"
 import "database/sql"
-import "github.com/joho/godotenv" 
+import "github.com/joho/godotenv"
 import "github.com/Tim-Restart/chirpy/internal/database"
 import "fmt"
+import "sync/atomic"
+import "time"
+import (
+	"github.com/google/uuid"
+)
 
-
-
-type Chirp struct {
-	Body string `json:"body"`
-	User_id uuid.UUID `json:"id"`
+type ApiConfig struct {
+	fileserverHits atomic.Int32
+	DBQueries      *database.Queries
+	platform       string
 }
 
+type User struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Email     string    `json:"email"`
+}
+
+// Struct for incoming JSON posts
+type parameters struct {
+	Body string `json:"body"`
+}
+
+// Successs repsonse struct
+type successResponse struct {
+	Valid bool `json:"valid"`
+}
+
+// Error response struct
+type errorResponse struct {
+	Error string `json:"error"`
+}
 
 func main() {
 
@@ -27,6 +52,8 @@ func main() {
 	if err != nil {
 		panic("Error loading .env files")
 	}
+
+	platform := os.Getenv("PLATFORM")
 
 	// set the dbURL to the path for the sql database from the .env file
 	dbURL := os.Getenv("DB_URL")
@@ -44,16 +71,11 @@ func main() {
 	dbQueries := database.New(db)
 
 	// Store it in the apiConfig struct so we have access anywhere
-	apiConfig := ApiConfig{
-		DBQueries: dbQueries,
-	}
-
-	fmt.Printf("apiConfig initialized: %+v\n", apiConfig)
-
-	
-
 	// Create an instance of apiConfig
-	cfg := ApiConfig{}
+	cfg := ApiConfig{
+		DBQueries: dbQueries,
+		platform:  platform,
+	}
 
 	// Make a new server
 	mux := http.NewServeMux()
@@ -65,24 +87,8 @@ func main() {
 	// FileServer is in http package, Dir converts the '.' to a directory part
 	mux.Handle("/app/", cfg.middlewareMetricsInc(http.StripPrefix("/app", fileHandler)))
 
-<<<<<<< HEAD
-
-=======
 	// vaidates the 140 characters of the chirp
 	mux.HandleFunc("POST /api/validate_chirp", func(w http.ResponseWriter, r *http.Request) {
-		
-		// Struct for incoming JSON posts
-		type parameters struct {
-			Body string `json:"body"`
-		}
-		// Successs repsonse struct
-		type successResponse struct {
-			Valid bool `json:"valid"`
-		}
-		// Error response struct
-		type errorResponse struct {
-			Error string `json:"error"`
-		}
 
 		decoder := json.NewDecoder(r.Body)
 		params := parameters{}
@@ -96,15 +102,15 @@ func main() {
 			if err != nil {
 				log.Printf("Error marshalling JSON %s", err)
 				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(500)
+				w.WriteHeader(http.StatusInternalServerError) // Status 500
 				return
 			}
 
 			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(500)
+			w.WriteHeader(http.StatusInternalServerError) // Status 500
 			w.Write(jsonResp)
 			return
-			
+
 		}
 
 		// Checks the length of the chirp
@@ -117,13 +123,13 @@ func main() {
 			if err != nil {
 				log.Printf("Error marshalling JSON %s", err)
 				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(400)
+				w.WriteHeader(http.StatusBadRequest) // Status 400
 				w.Write(jsonResp)
 				return
 			}
 
 			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(400)
+			w.WriteHeader(http.StatusBadRequest) // Status 400
 			w.Write(jsonResp)
 			return
 		}
@@ -133,33 +139,14 @@ func main() {
 		}
 
 		chirp := badWordReplacement(params.Body)
-		
-		
-
-		//successChirp := successResponse{
-		//	Valid: true,
-		//}
-
-		//jsonResp, err := json.Marshal(successChirp)
-		//if err != nil {
-		//	log.Printf("Error marshalling JSON %s", err)
-		//	w.Header().Set("Content-Type", "application/json")
-		//	w.WriteHeader(500)
-		//	return
-		//}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(200)
 		w.Write(chirp)
-		
 
 	})
->>>>>>> parent of 3c812e0 (SQL DB updated through push)
 
 	// mux.HandleFunc()
-
-	// Validates the chirps to length and bad words
-	mux.HandleFunc("POST /api/validate_chirp", handlerChirpsValidate)
 
 	// Adds a new user to the database
 	mux.HandleFunc("POST /api/users", cfg.addUser)
@@ -171,26 +158,25 @@ func main() {
 	mux.HandleFunc("POST /admin/reset", cfg.metricsResetHandler)
 
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
-	// Set the content type header
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		// Set the content type header
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
-	// Write the status code
-	w.WriteHeader(http.StatusOK)
+		// Write the status code
+		w.WriteHeader(http.StatusOK)
 
-	// Write the response body
-	w.Write([]byte("OK\n"))
+		// Write the response body
+		w.Write([]byte("OK\n"))
 
 	})
 
 	// Create a new Server struct
 	server := &http.Server{
-		Addr: ":8080",
+		Addr:    ":8080",
 		Handler: mux,
 	}
 
-	fmt.Println("Ready to serve my lord")
+	fmt.Println("######## Ready to serve my lord ########")
 	// Start the server
 	server.ListenAndServe()
-	
 
 }

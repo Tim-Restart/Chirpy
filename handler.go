@@ -1,15 +1,9 @@
 package main
 
 import "net/http"
-import "sync/atomic"
 import "fmt"
-import "github.com/Tim-Restart/chirpy/internal/database"
-
-
-type ApiConfig struct {
-	fileserverHits atomic.Int32
-	DBQueries *database.Queries
-}
+import "encoding/json"
+import "log"
 
 func (cfg *ApiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 	// Increments the fileserverHits
@@ -37,15 +31,48 @@ func (cfg *ApiConfig) metricsHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Sets the header type to HTML
 	w.Header().Set("Content-Type", "text/html")
-	
+
 	// Write the html to the response
 	fmt.Fprint(w, htmlContent)
 }
 
 func (cfg *ApiConfig) metricsResetHandler(w http.ResponseWriter, r *http.Request) {
+
+	// Check if user is dev prior to allowing reset
+	if cfg.platform != "dev" {
+		// Error for not having the right permission
+		errResp := errorResponse{
+			Error: "This endpoint only avaliable in development mode",
+		}
+
+		jsonResp, err := json.Marshal(errResp)
+		if err != nil {
+			log.Printf("Error marshalling JSON %s", err)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError) // 500 error code
+			w.Write([]byte(`{"error":"Internal server error"}`))
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden) // 403 error code
+		w.Write(jsonResp)
+		return
+	}
+
+	// Calls the SQLC genereated function to delete all users
+	err := cfg.DBQueries.DeleteAllUsers(r.Context())
+	if err != nil {
+		log.Printf("Error deleting users: %s", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"error":"Failed to reset database"}`))
+		return
+	}
+
 	cfg.fileserverHits.Store(0)
+	w.WriteHeader(http.StatusOK) // Status  200
 	w.Write([]byte("Counter Reset\n"))
-<<<<<<< HEAD
 }
 
 // Function to add a new user to the database by email - uses SQL query from SQLC
@@ -61,14 +88,14 @@ func (cfg *ApiConfig) addUser(w http.ResponseWriter, r *http.Request) {
 		errResp := errorResponse{
 			Error: "Invalid request body: " + err.Error(),
 		}
-		
+
 		jsonResp, err := json.Marshal(errResp)
 		if err != nil {
 			log.Printf("Error marshalling JSON: %s", err)
 			w.WriteHeader(http.StatusInternalServerError) // Status 500
 			return
 		}
-		
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest) // 400 for client errors
 		w.Write(jsonResp)
@@ -96,10 +123,10 @@ func (cfg *ApiConfig) addUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := User{
-		ID:			dbUser.ID,
-		CreatedAt:	dbUser.CreatedAt,
-		UpdatedAt:	dbUser.UpdatedAt,
-		Email:		dbUser.Email,
+		ID:        dbUser.ID,
+		CreatedAt: dbUser.CreatedAt,
+		UpdatedAt: dbUser.UpdatedAt,
+		Email:     dbUser.Email,
 	}
 
 	userJSON, err := json.Marshal(user)
@@ -115,7 +142,3 @@ func (cfg *ApiConfig) addUser(w http.ResponseWriter, r *http.Request) {
 	w.Write(userJSON)
 
 }
-
-=======
-}
->>>>>>> parent of 3c812e0 (SQL DB updated through push)
