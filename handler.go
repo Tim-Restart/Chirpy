@@ -1,10 +1,15 @@
 package main
 
 import "net/http"
+import "sync/atomic"
 import "fmt"
-import "encoding/json"
-import "log"
+import "github.com/Tim-Restart/chirpy/internal/database"
 
+
+type ApiConfig struct {
+	fileserverHits atomic.Int32
+	DBQueries *database.Queries
+}
 
 func (cfg *ApiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 	// Increments the fileserverHits
@@ -38,43 +43,9 @@ func (cfg *ApiConfig) metricsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg *ApiConfig) metricsResetHandler(w http.ResponseWriter, r *http.Request) {
-
-	// Check if user is dev prior to allowing reset
-	if cfg.platform != "dev" {
-		// Error for not having the right permission
-		errResp := errorResponse{
-			Error: "This endpoint only avaliable in development mode",
-		}
-
-		jsonResp, err := json.Marshal(errResp)
-		if err != nil {
-			log.Printf("Error marshalling JSON %s", err)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError) // 500 error code
-			w.Write([]byte(`{"error":"Internal server error"}`))
-            return
-		}
-	
-		
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusForbidden) // 403 error code
-		w.Write(jsonResp)
-		return
-	}
-
-	// Calls the SQLC genereated function to delete all users
-	err := cfg.DBQueries.DeleteAllUsers(r.Context())
-	if err != nil {
-		log.Printf("Error deleting users: %s", err)
-        w.Header().Set("Content-Type", "application/json")
-        w.WriteHeader(http.StatusInternalServerError)
-        w.Write([]byte(`{"error":"Failed to reset database"}`))
-        return
-		}
-
 	cfg.fileserverHits.Store(0)
-	w.WriteHeader(http.StatusOK) // Status  200
 	w.Write([]byte("Counter Reset\n"))
+<<<<<<< HEAD
 }
 
 // Function to add a new user to the database by email - uses SQL query from SQLC
@@ -145,3 +116,6 @@ func (cfg *ApiConfig) addUser(w http.ResponseWriter, r *http.Request) {
 
 }
 
+=======
+}
+>>>>>>> parent of 3c812e0 (SQL DB updated through push)
