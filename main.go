@@ -42,6 +42,11 @@ type errorResponse struct {
 	Error string `json:"error"`
 }
 
+type Chirp struct {
+	Body string `json:"body"`
+	User_id uuid.UUID `json:"id"`
+}
+
 
 func main() {
 
@@ -88,69 +93,12 @@ func main() {
 	// FileServer is in http package, Dir converts the '.' to a directory part
 	mux.Handle("/app/", cfg.middlewareMetricsInc(http.StripPrefix("/app", fileHandler)))
 
-	// vaidates the 140 characters of the chirp
-	mux.HandleFunc("POST /api/validate_chirp", func(w http.ResponseWriter, r *http.Request) {
-		
 
-		decoder := json.NewDecoder(r.Body)
-		params := parameters{}
-		err := decoder.Decode(&params)
-		if err != nil {
-			errResp := errorResponse{
-				Error: "Something went wrong",
-			}
-
-			jsonResp, err := json.Marshal(errResp)
-			if err != nil {
-				log.Printf("Error marshalling JSON %s", err)
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusInternalServerError) // Status 500
-				return
-			}
-
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError) // Status 500
-			w.Write(jsonResp)
-			return
-			
-		}
-
-		// Checks the length of the chirp
-		if len(params.Body) > 140 {
-			errResp := errorResponse{
-				Error: "Chirp is too long",
-			}
-
-			jsonResp, err := json.Marshal(errResp)
-			if err != nil {
-				log.Printf("Error marshalling JSON %s", err)
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusBadRequest) // Status 400
-				w.Write(jsonResp)
-				return
-			}
-
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest) // Status 400
-			w.Write(jsonResp)
-			return
-		}
-
-		type cleanedBody struct {
-			Cleaned string `json:"cleaned"`
-		}
-
-		chirp := badWordReplacement(params.Body)
-		
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(200)
-		w.Write(chirp)
-		
-
-	})
 
 	// mux.HandleFunc()
+
+	// Validates the chirps to length and bad words
+	mux.HandleFunc("POST /api/validate_chirp", handlerChirpsValidate)
 
 	// Adds a new user to the database
 	mux.HandleFunc("POST /api/users", cfg.addUser)

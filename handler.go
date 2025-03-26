@@ -144,3 +144,4 @@ func (cfg *ApiConfig) addUser(w http.ResponseWriter, r *http.Request) {
 	w.Write(userJSON)
 
 }
+
