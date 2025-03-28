@@ -4,6 +4,8 @@ import "net/http"
 import "fmt"
 import "encoding/json"
 import "log"
+import "github.com/Tim-Restart/chirpy/internal/database"
+import "github.com/google/uuid"
 
 func (cfg *ApiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 	// Increments the fileserverHits
@@ -140,5 +142,131 @@ func (cfg *ApiConfig) addUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated) // 201 for resource creation
 	w.Write(userJSON)
+
+}
+
+func (cfg *ApiConfig) newChirp(w http.ResponseWriter, r *http.Request) {
+
+	type Chirp_Input struct {
+		Body    string `json:"body"`
+		User_id string `json:"user_id"`
+	}
+
+	// Created an empty Chirp struct
+	var params Chirp_Input
+
+	// Decode the JSON input and assign it to the Chirp_input struct
+	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+		errResp := errorResponse{
+			Error: "Invalid request body: " + err.Error(),
+		}
+
+		jsonResp, err := json.Marshal(errResp)
+		if err != nil {
+			log.Printf("Error marshalling JSON: %s", err)
+			w.WriteHeader(http.StatusInternalServerError) // Status 500
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest) // 400 for client errors
+		w.Write(jsonResp)
+		return
+	}
+
+	// Checks the length of the chirp
+	if len(params.Body) > 140 {
+		errResp := errorResponse{
+			Error: "Chirp is too long",
+		}
+
+		jsonResp, err := json.Marshal(errResp)
+		if err != nil {
+			log.Printf("Error marshalling JSON %s", err)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest) // Status 400
+			w.Write(jsonResp)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest) // Status 400
+		w.Write(jsonResp)
+		return
+	}
+
+	// Clean the chirp body
+	cleanedBodyBytes := badWordReplacement(params.Body)
+	cleanedBody := string(cleanedBodyBytes)
+	fmt.Printf(cleanedBody)
+
+	// 4. Parse the User_id string into a UUID
+	userUUID, err := uuid.Parse(params.User_id)
+	if err != nil {
+		errResp := errorResponse{
+			Error: "Invalid user ID format",
+		}
+
+		jsonResp, err := json.Marshal(errResp)
+		if err != nil {
+			log.Printf("Error marshalling JSON: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write(jsonResp)
+		return
+	}
+
+	// Create the NewChirpParams struct
+	chirpParams := database.NewChirpParams{
+		Body:   cleanedBody,
+		UserID: userUUID,
+	}
+
+	// Run the newChirp query? and deal with any errors
+	// Sends through the JSON input to the query as args
+
+	dbChirp, err := cfg.DBQueries.NewChirp(r.Context(), chirpParams)
+	if err != nil {
+		log.Println("Error mapping to chirp database: %v", err)
+
+		errResp := errorResponse{
+			Error: "Error creating new chirp: " + err.Error(),
+		}
+
+		jsonResp, err := json.Marshal(errResp)
+		if err != nil {
+			log.Printf("Error marshalling JSON: %s", err)
+			w.WriteHeader(http.StatusInternalServerError) // Status 500
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError) // Status 500
+		w.Write(jsonResp)
+		return
+	}
+
+	new_Chirp := Chirp{
+		ID:        dbChirp.ID,
+		CreatedAt: dbChirp.CreatedAt,
+		UpdatedAt: dbChirp.UpdatedAt,
+		Body:      dbChirp.Body,
+		User_ID:   userUUID,
+	}
+
+	chirpJSON, err := json.Marshal(new_Chirp)
+	if err != nil {
+		log.Printf("Error marshalling user: %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Successful response - returns the userJSON marshalled
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated) // 201 for resource creation
+	w.Write(chirpJSON)
 
 }

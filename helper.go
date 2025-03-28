@@ -1,10 +1,8 @@
 package main
 
-import "encoding/json"
-import "log"
 import "strings"
 
-func badWordReplacement(chirpy string) []byte {
+func badWordReplacement(chirpy string) string {
 	//Struct for formating the JSON response
 	type cleanedBody struct {
 		CleanedBody string `json:"cleaned_body"`
@@ -28,16 +26,18 @@ func badWordReplacement(chirpy string) []byte {
 	// Joins the array back together
 	modifiedChirp := strings.Join(chirp, " ")
 
+	return modifiedChirp
+
 	// Assign the cleaned chirp to the struct for JSON marshalling
-	cleanedChirp := cleanedBody{
-		CleanedBody: modifiedChirp,
-	}
+	//cleanedChirp := cleanedBody{
+	//	CleanedBody: modifiedChirp,
+	//}
 
 	// Marshal the response into JSON and check it works
-	jsonResp, err := json.Marshal(cleanedChirp)
-	if err != nil {
-		log.Printf("Error marshalling JSON %s", err)
-		return nil
-	}
-	return jsonResp
+	//jsonResp, err := json.Marshal(cleanedChirp)
+	//if err != nil {
+	//	log.Printf("Error marshalling JSON %s", err)
+	//	return nil
+	//}
+	//return jsonResp
 }

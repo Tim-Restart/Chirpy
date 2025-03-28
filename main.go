@@ -28,6 +28,14 @@ type User struct {
 	Email     string    `json:"email"`
 }
 
+type Chirp struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Body      string    `json:"body"`
+	User_ID   uuid.UUID `json:"user_id"`
+}
+
 // Struct for incoming JSON posts
 type parameters struct {
 	Body string `json:"body"`
@@ -140,13 +148,22 @@ func main() {
 
 		chirp := badWordReplacement(params.Body)
 
+		cleanedResp, err := json.Marshal(chirp)
+		if err != nil {
+			log.Printf("Error marshalling JSON %s", err)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(200)
-		w.Write(chirp)
+		w.Write(cleanedResp)
 
 	})
 
 	// mux.HandleFunc()
+
+	// Adds a new chirp to the users wall
+	mux.HandleFunc("POST /api/chirps", cfg.newChirp)
 
 	// Adds a new user to the database
 	mux.HandleFunc("POST /api/users", cfg.addUser)
