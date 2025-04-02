@@ -270,3 +270,35 @@ func (cfg *ApiConfig) newChirp(w http.ResponseWriter, r *http.Request) {
 	w.Write(chirpJSON)
 
 }
+
+// This is the handler function that calls on the DB query to get all the chirps
+// This function only creates the JSON response and encodes it, it then returns
+// The HTTP responses and JSON
+
+func (cfg *ApiConfig) handleGetChirps(w http.ResponseWriter, r *http.Request) {
+	// Use the request's context for the query
+	ctx := r.Context()
+
+	// Call the GetChirps function to fetch chirps from the database
+	chirps, err := cfg.getChirps(ctx)
+	if err != nil {
+		// If an error occurred, respond with 500 Internal Server Error
+		http.Error(w, "Failed to fetch chirps", http.StatusInternalServerError)
+		log.Printf("Database error: %s", err)
+		return
+	}
+
+	// Set JSON content type for the response
+	w.Header().Set("Content-Type", "application/json")
+
+	// Encode the chirps as JSON and write it to the response
+	err = json.NewEncoder(w).Encode(chirps)
+	if err != nil {
+		// Handle JSON encoding failure
+		http.Error(w, "Failed to encode chirps", http.StatusInternalServerError)
+		log.Printf("JSON encoding error: %s", err)
+		return
+	}
+
+	// Response is automatically written at this point (status 200 OK by default)
+}

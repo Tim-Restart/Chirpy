@@ -1,6 +1,10 @@
 package main
 
-import "strings"
+import (
+	"context"
+	"log"
+	"strings"
+)
 
 func badWordReplacement(chirpy string) string {
 	//Struct for formating the JSON response
@@ -40,4 +44,32 @@ func badWordReplacement(chirpy string) string {
 	//	return nil
 	//}
 	//return jsonResp
+}
+
+// Returns all chirps in order by created_at
+
+func (cfg *ApiConfig) getChirps(ctx context.Context) ([]Chirp, error) {
+
+	// Fetch chirps from the database
+	chirpsFromDB, err := cfg.DBQueries.GetChirps(ctx)
+	if err != nil {
+		log.Print("Failed to fetch chirps")
+		return nil, err
+	}
+
+	// Transform the results if necessary
+	chirpsResponse := []Chirp{}
+	for _, chirp := range chirpsFromDB {
+		chirpsResponse = append(chirpsResponse, Chirp{
+			ID:        chirp.ID,        // Assuming ID is a UUID and needs conversion
+			CreatedAt: chirp.CreatedAt, // Timestamp
+			UpdatedAt: chirp.UpdatedAt, // Timestamp
+			Body:      chirp.Body,      // The body of the chirp
+			User_ID:   chirp.UserID,    // Assuming UserID is a UUID
+		})
+
+		// Return the slice of chirps and nil error on success
+
+	}
+	return chirpsResponse, nil
 }

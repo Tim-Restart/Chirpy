@@ -168,6 +168,9 @@ func main() {
 	// Adds a new user to the database
 	mux.HandleFunc("POST /api/users", cfg.addUser)
 
+	// Gets all chirps and returns them by order of created_at
+	mux.HandleFunc("GET /api/chirps", cfg.handleGetChirps)
+
 	// returns the server metrics
 	mux.HandleFunc("GET /admin/metrics", cfg.metricsHandler)
 
