@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
+	"net/http"
 	"strings"
 )
 
@@ -47,6 +49,7 @@ func badWordReplacement(chirpy string) string {
 }
 
 // Returns all chirps in order by created_at
+// This is then called by the handler function to create the response
 
 func (cfg *ApiConfig) getChirps(ctx context.Context) ([]Chirp, error) {
 
@@ -72,4 +75,16 @@ func (cfg *ApiConfig) getChirps(ctx context.Context) ([]Chirp, error) {
 
 	}
 	return chirpsResponse, nil
+}
+
+// Helper function to handle all JSON encoding
+
+func respondWithJSON(w http.ResponseWriter, status int, data interface{}) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	err := json.NewEncoder(w).Encode(data)
+	if err != nil {
+		return err
+	}
+	return nil
 }

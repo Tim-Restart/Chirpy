@@ -237,16 +237,13 @@ func (cfg *ApiConfig) newChirp(w http.ResponseWriter, r *http.Request) {
 			Error: "Error creating new chirp: " + err.Error(),
 		}
 
-		jsonResp, err := json.Marshal(errResp)
+		err = respondWithJSON(w, 500, errResp)
 		if err != nil {
-			log.Printf("Error marshalling JSON: %s", err)
-			w.WriteHeader(http.StatusInternalServerError) // Status 500
+			// Handle JSON encoding error
+			http.Error(w, "Failed to encode chirps", http.StatusInternalServerError)
+			log.Printf("JSON encoding error: %s", err)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError) // Status 500
-		w.Write(jsonResp)
-		return
 	}
 
 	new_Chirp := Chirp{
@@ -257,18 +254,15 @@ func (cfg *ApiConfig) newChirp(w http.ResponseWriter, r *http.Request) {
 		User_ID:   userUUID,
 	}
 
-	chirpJSON, err := json.Marshal(new_Chirp)
+	// Testing respondWithJSON
+
+	err = respondWithJSON(w, 201, new_Chirp)
 	if err != nil {
-		log.Printf("Error marshalling user: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		// Handle JSON encoding error
+		http.Error(w, "Failed to encode chirps", http.StatusInternalServerError)
+		log.Printf("JSON encoding error: %s", err)
 		return
 	}
-
-	// Successful response - returns the userJSON marshalled
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated) // 201 for resource creation
-	w.Write(chirpJSON)
-
 }
 
 // This is the handler function that calls on the DB query to get all the chirps
@@ -288,17 +282,26 @@ func (cfg *ApiConfig) handleGetChirps(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set JSON content type for the response
-	w.Header().Set("Content-Type", "application/json")
+	// Trying out the respondWithJSON helper
 
-	// Encode the chirps as JSON and write it to the response
-	err = json.NewEncoder(w).Encode(chirps)
+	err = respondWithJSON(w, http.StatusOK, chirps)
 	if err != nil {
-		// Handle JSON encoding failure
+		// Handle JSON encoding error
 		http.Error(w, "Failed to encode chirps", http.StatusInternalServerError)
 		log.Printf("JSON encoding error: %s", err)
 		return
 	}
 
-	// Response is automatically written at this point (status 200 OK by default)
+	// Set JSON content type for the response
+	//w.Header().Set("Content-Type", "application/json")
+
+	// Encode the chirps as JSON and write it to the response
+	//err = json.NewEncoder(w).Encode(chirps)
+	//if err != nil {
+	// Handle JSON encoding failure
+	//	http.Error(w, "Failed to encode chirps", http.StatusInternalServerError)
+	//	log.Printf("JSON encoding error: %s", err)
+	//	return
 }
+
+// Response is automatically written at this point (status 200 OK by default)
