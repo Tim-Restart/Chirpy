@@ -1,11 +1,15 @@
 package main
 
-import "net/http"
-import "fmt"
-import "encoding/json"
-import "log"
-import "github.com/Tim-Restart/chirpy/internal/database"
-import "github.com/google/uuid"
+import (
+	"net/http"
+	"fmt"
+	"encoding/json"
+	"log"
+	"github.com/Tim-Restart/chirpy/internal/database"
+	"github.com/google/uuid"
+	
+)
+
 
 func (cfg *ApiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 	// Increments the fileserverHits
@@ -207,6 +211,7 @@ func (cfg *ApiConfig) newChirp(w http.ResponseWriter, r *http.Request) {
 			Error: "Invalid user ID format",
 		}
 
+
 		jsonResp, err := json.Marshal(errResp)
 		if err != nil {
 			log.Printf("Error marshalling JSON: %s", err)
@@ -292,16 +297,61 @@ func (cfg *ApiConfig) handleGetChirps(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set JSON content type for the response
-	//w.Header().Set("Content-Type", "application/json")
-
-	// Encode the chirps as JSON and write it to the response
-	//err = json.NewEncoder(w).Encode(chirps)
-	//if err != nil {
-	// Handle JSON encoding failure
-	//	http.Error(w, "Failed to encode chirps", http.StatusInternalServerError)
-	//	log.Printf("JSON encoding error: %s", err)
-	//	return
 }
 
-// Response is automatically written at this point (status 200 OK by default)
+// Returns a single chirp by using the UUID of the chirp
+// http.Request.PathValue used in here to do something with a string
+
+func (cfg *ApiConfig) getChirp(w http.ResponseWriter, r *http.Request) {
+
+	// Ok something here about using the UUID to do a query on the DB?
+	// Don't forget context...
+	idString := r.PathValue("chirpID")
+	chirpToGet, err:= uuid.Parse(idString)
+	if err != nil {
+		errResp := errorResponse{
+			Error: "Invalid Chirp ID format",
+		}
+		http.Error(w, "Failed to encode UUID for chirp", http.StatusInternalServerError)
+		log.Printf("JSON encoding error: %s", errResp)
+		return
+	}
+	// maybe assign variable here for the chirp ID?
+
+
+	dbChirp, err := cfg.DBQueries.GetChirp(r.Context(), chirpToGet)
+	if err != nil {
+		log.Println("Error finding chirp in database: %v", err)
+
+		errResp := errorResponse{
+			Error: "Error finding chirp: " + err.Error(),
+		}
+
+		err = respondWithJSON(w, 500, errResp)
+		if err != nil {
+			// Handle JSON encoding error
+			http.Error(w, "Failed to encode chirps", http.StatusInternalServerError)
+			log.Printf("JSON encoding error: %s", err)
+			return
+		}
+	}
+
+	new_Chirp := Chirp{
+		ID:        dbChirp.ID,
+		CreatedAt: dbChirp.CreatedAt,
+		UpdatedAt: dbChirp.UpdatedAt,
+		Body:      dbChirp.Body,
+		User_ID:   dbChirp.UserID,
+	}
+
+	err = respondWithJSON(w, http.StatusOK, new_Chirp)
+	if err != nil {
+		// Handle JSON encoding error
+		http.Error(w, "Failed to encode chirps", http.StatusInternalServerError)
+		log.Printf("JSON encoding error: %s", err)
+		return
+	}
+
+}
+
+

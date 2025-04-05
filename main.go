@@ -171,6 +171,9 @@ func main() {
 	// Gets all chirps and returns them by order of created_at
 	mux.HandleFunc("GET /api/chirps", cfg.handleGetChirps)
 
+	// Gets single Chirp from UUID for the Chirp (not the user)
+	mux.HandleFunc("GET /api/chirps/{chirpID}", cfg.getChirp)
+
 	// returns the server metrics
 	mux.HandleFunc("GET /admin/metrics", cfg.metricsHandler)
 

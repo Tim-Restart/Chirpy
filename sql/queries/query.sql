@@ -16,5 +16,10 @@ RETURNING *;
 SELECT * FROM chirps 
 ORDER BY created_at ASC;
 
+-- name: GetChirp :one
+SELECT * 
+FROM chirps
+WHERE ID = $1;
+
 -- name: DeleteAllUsers :exec
 DELETE FROM users;
