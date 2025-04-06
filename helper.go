@@ -88,3 +88,6 @@ func respondWithJSON(w http.ResponseWriter, status int, data interface{}) error 
 	}
 	return nil
 }
+
+// Function to search via user email address
+

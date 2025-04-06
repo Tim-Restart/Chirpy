@@ -1,7 +1,7 @@
 -- name: CreateUser :one
-INSERT INTO users (id, created_at, updated_at, email)
+INSERT INTO users (id, created_at, updated_at, email, hashed_password)
 VALUES (
-    gen_random_uuid(), NOW(), NOW(), $1
+    gen_random_uuid(), NOW(), NOW(), $1, $2
 )
 RETURNING *;
 
@@ -19,6 +19,11 @@ ORDER BY created_at ASC;
 -- name: GetChirp :one
 SELECT * 
 FROM chirps
+WHERE ID = $1;
+
+-- name: GetEmail :one
+SELECT *
+FROM users
 WHERE ID = $1;
 
 -- name: DeleteAllUsers :exec

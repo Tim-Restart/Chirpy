@@ -7,6 +7,8 @@ CREATE TABLE users(
 	email TEXT NOT NULL UNIQUE
 );
 -- +goose StatementEnd
+ALTER TABLE users
+ADD COLUMN hashed_password TEXT NOT NULL;
 
 -- +goose Down
 -- +goose StatementBegin

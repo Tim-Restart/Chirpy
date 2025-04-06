@@ -1,17 +1,17 @@
 package main
 
-import "net/http"
-import "encoding/json"
-import "log"
-import _ "github.com/lib/pq"
-import "os"
-import "database/sql"
-import "github.com/joho/godotenv"
-import "github.com/Tim-Restart/chirpy/internal/database"
-import "fmt"
-import "sync/atomic"
-import "time"
 import (
+	"net/http"
+	"encoding/json"
+	"log"
+	_ "github.com/lib/pq"
+	"os"
+	"database/sql"
+	"github.com/joho/godotenv"
+	"github.com/Tim-Restart/chirpy/internal/database"
+	"fmt"
+	"sync/atomic"
+	"time"
 	"github.com/google/uuid"
 )
 
@@ -26,6 +26,7 @@ type User struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 	Email     string    `json:"email"`
+	Hashed_Password string `json:"hashed_password"`
 }
 
 type Chirp struct {
@@ -173,6 +174,9 @@ func main() {
 
 	// Gets single Chirp from UUID for the Chirp (not the user)
 	mux.HandleFunc("GET /api/chirps/{chirpID}", cfg.getChirp)
+
+	// Login endpoint
+	mux.HandleFunc("POST /api/login", cfg.login)
 
 	// returns the server metrics
 	mux.HandleFunc("GET /admin/metrics", cfg.metricsHandler)

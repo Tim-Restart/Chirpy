@@ -7,7 +7,7 @@ import (
 	"log"
 	"github.com/Tim-Restart/chirpy/internal/database"
 	"github.com/google/uuid"
-	
+	"github.com/Tim-Restart/chirpy/internal/auth"
 )
 
 
@@ -108,7 +108,26 @@ func (cfg *ApiConfig) addUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dbUser, err := cfg.DBQueries.CreateUser(r.Context(), params.Email)
+	// Logic to hash the password and return it to upload to the database 
+
+	hash, err := HashedPassword(params.HashedPassword)
+	if err != nil {
+		// Prints the error to the terminal
+		log.Println("Error hashing password")
+		// Creates the error to respond with
+		errResp := errorResponse{
+			Error: "Error creating user password: " + err.Error(),
+		}
+
+		errJ = respondWithJSON(w, 500, errResp)
+		if errJ != nil {
+			// Handle JSON encoding error
+			http.Error(w, "Failed to encode password", http.StatusInternalServerError)
+			log.Printf("JSON encoding error: %s", err)
+			return
+		}
+
+	dbUser, err := cfg.DBQueries.CreateUser(r.Context(), params.Email, hash)
 	if err != nil {
 		log.Println("Error mapping to database")
 
@@ -128,12 +147,14 @@ func (cfg *ApiConfig) addUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	
+	// Do not include a password hash or field here!
 	user := User{
 		ID:        dbUser.ID,
 		CreatedAt: dbUser.CreatedAt,
 		UpdatedAt: dbUser.UpdatedAt,
 		Email:     dbUser.Email,
-	}
+		}
 
 	userJSON, err := json.Marshal(user)
 	if err != nil {
@@ -353,5 +374,65 @@ func (cfg *ApiConfig) getChirp(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
+
+func( cfg *ApiConfig) login(w http.ResponseWriter, r *http.Request) {
+
+	// Define a struct to take the JSON input
+	type User_details struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	// Create an empty of above
+	var params User_details
+	// Decode the inputed JSON response to the memory
+	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+		// Deal with any JSON decoding errors
+		errResp := errorResponse{
+			Error: "Invalid request body: " + err.Error(),
+		}
+		// Respond using the helper function
+		errJ := respondWithJSON(w, 500, errResp)
+		if errJ != nil {
+			// Handle JSON encoding error
+			http.Error(w, "Failed to encode JSON", http.StatusInternalServerError)
+			log.Printf("JSON encoding error: %s", err)
+			return
+	}
+}
+	// Start by looking up a user in the DB by their email and return the hash?
+	dbUser, err := cfg.DBQueries.GetEmail(r.Context(), params.Email)
+	// use the hash and the new password to send to the comparer
+
+	err := CheckPasswordHash(dbUser.HashedPassword, params.Password)
+	if err != nil {
+		errJ := respondWithJSON(w, 401, errResp)
+		if errJ != nil {
+			// Handle JSON encoding error
+			http.Error(w, "Failed to encode JSON", http.StatusInternalServerError)
+			log.Printf("JSON encoding error: %s", err)
+			return
+		}
+	}
+
+	// Assign the user information to be returned on successful password
+	user := User{
+		ID:        dbUser.ID,
+		CreatedAt: dbUser.CreatedAt,
+		UpdatedAt: dbUser.UpdatedAt,
+		Email:     dbUser.Email,
+		}
+	
+	// Encode the response and return the results
+	err := respondWithJSON(w, 200, user)
+	if err != nil {
+		// Handle JSON encoding error
+		http.Error(w, "Failed to encode JSON", http.StatusInternalServerError)
+		log.Printf("JSON encoding error: %s", err)
+		return
+	}
+	
+}
+
 
 
