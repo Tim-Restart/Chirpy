@@ -86,7 +86,8 @@ func (cfg *ApiConfig) metricsResetHandler(w http.ResponseWriter, r *http.Request
 func (cfg *ApiConfig) addUser(w http.ResponseWriter, r *http.Request) {
 
 	type createUserRequest struct {
-		Email string `json:"email"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 
 	var params createUserRequest
@@ -110,7 +111,7 @@ func (cfg *ApiConfig) addUser(w http.ResponseWriter, r *http.Request) {
 
 	// Logic to hash the password and return it to upload to the database 
 
-	hash, err := HashedPassword(params.HashedPassword)
+	hash, err := auth.HashPassword(params.Password)
 	if err != nil {
 		// Prints the error to the terminal
 		log.Println("Error hashing password")
@@ -119,15 +120,23 @@ func (cfg *ApiConfig) addUser(w http.ResponseWriter, r *http.Request) {
 			Error: "Error creating user password: " + err.Error(),
 		}
 
-		errJ = respondWithJSON(w, 500, errResp)
-		if errJ != nil {
+		err = respondWithJSON(w, 500, errResp)
+		if err != nil {
 			// Handle JSON encoding error
 			http.Error(w, "Failed to encode password", http.StatusInternalServerError)
 			log.Printf("JSON encoding error: %s", err)
 			return
 		}
+		return
+	}
 
-	dbUser, err := cfg.DBQueries.CreateUser(r.Context(), params.Email, hash)
+	// Create a CreateUserParams struct
+	createParams := database.CreateUserParams{
+		Email:          params.Email,
+		HashedPassword: hash,
+}
+
+	dbUser, err := cfg.DBQueries.CreateUser(r.Context(), createParams)
 	if err != nil {
 		log.Println("Error mapping to database")
 
@@ -257,7 +266,7 @@ func (cfg *ApiConfig) newChirp(w http.ResponseWriter, r *http.Request) {
 
 	dbChirp, err := cfg.DBQueries.NewChirp(r.Context(), chirpParams)
 	if err != nil {
-		log.Println("Error mapping to chirp database: %v", err)
+		log.Printf("Error mapping to chirp database: %v", err)
 
 		errResp := errorResponse{
 			Error: "Error creating new chirp: " + err.Error(),
@@ -375,7 +384,7 @@ func (cfg *ApiConfig) getChirp(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func( cfg *ApiConfig) login(w http.ResponseWriter, r *http.Request) {
+func (cfg *ApiConfig) login(w http.ResponseWriter, r *http.Request) {
 
 	// Define a struct to take the JSON input
 	type User_details struct {
@@ -398,14 +407,30 @@ func( cfg *ApiConfig) login(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Failed to encode JSON", http.StatusInternalServerError)
 			log.Printf("JSON encoding error: %s", err)
 			return
-	}
+		}
+	
 }
 	// Start by looking up a user in the DB by their email and return the hash?
 	dbUser, err := cfg.DBQueries.GetEmail(r.Context(), params.Email)
+	if err != nil {
+		errResp := errorResponse{
+			Error: "Incorrect email or password",
+		}
+		errJ := respondWithJSON(w, 401, errResp)
+		if errJ != nil {
+			http.Error(w, "Failed to encode JSON", http.StatusInternalServerError)
+			log.Printf("JSON encoding error: %s", errJ)
+		}
+		return
+	}
+
 	// use the hash and the new password to send to the comparer
 
-	err := CheckPasswordHash(dbUser.HashedPassword, params.Password)
+	err = auth.CheckPasswordHash(dbUser.HashedPassword, params.Password)
 	if err != nil {
+		errResp := errorResponse{
+			Error: "Incorrect email or password",
+		}
 		errJ := respondWithJSON(w, 401, errResp)
 		if errJ != nil {
 			// Handle JSON encoding error
@@ -424,7 +449,7 @@ func( cfg *ApiConfig) login(w http.ResponseWriter, r *http.Request) {
 		}
 	
 	// Encode the response and return the results
-	err := respondWithJSON(w, 200, user)
+	err = respondWithJSON(w, 200, user)
 	if err != nil {
 		// Handle JSON encoding error
 		http.Error(w, "Failed to encode JSON", http.StatusInternalServerError)

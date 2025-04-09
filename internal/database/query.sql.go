@@ -102,11 +102,11 @@ func (q *Queries) GetChirps(ctx context.Context) ([]Chirp, error) {
 const getEmail = `-- name: GetEmail :one
 SELECT id, created_at, updated_at, email, hashed_password
 FROM users
-WHERE ID = $1
+WHERE email = $1
 `
 
-func (q *Queries) GetEmail(ctx context.Context, id uuid.UUID) (User, error) {
-	row := q.db.QueryRowContext(ctx, getEmail, id)
+func (q *Queries) GetEmail(ctx context.Context, email string) (User, error) {
+	row := q.db.QueryRowContext(ctx, getEmail, email)
 	var i User
 	err := row.Scan(
 		&i.ID,
