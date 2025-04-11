@@ -76,6 +76,12 @@ func main() {
 		panic(err)
 	}
 
+	// Load the .env secret key
+	secret := os.Getenv("SECRET")
+	if secret == "" {
+		panic("SECRET is not set in the enviroment, check .env file")
+	}
+
 	// Create a new instance of *database.Queries
 	dbQueries := database.New(db)
 

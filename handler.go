@@ -8,6 +8,7 @@ import (
 	"github.com/Tim-Restart/chirpy/internal/database"
 	"github.com/google/uuid"
 	"github.com/Tim-Restart/chirpy/internal/auth"
+	"time"
 )
 
 
@@ -351,7 +352,7 @@ func (cfg *ApiConfig) getChirp(w http.ResponseWriter, r *http.Request) {
 
 	dbChirp, err := cfg.DBQueries.GetChirp(r.Context(), chirpToGet)
 	if err != nil {
-		log.Println("Error finding chirp in database: %v", err)
+		log.Printf("Error finding chirp in database: %v", err)
 
 		errResp := errorResponse{
 			Error: "Error finding chirp: " + err.Error(),
@@ -387,13 +388,14 @@ func (cfg *ApiConfig) getChirp(w http.ResponseWriter, r *http.Request) {
 func (cfg *ApiConfig) login(w http.ResponseWriter, r *http.Request) {
 
 	// Define a struct to take the JSON input
-	type User_details struct {
+	type LoginRequest struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
+		ExpiresInSeconds *int    `json:"expires_in_seconds"`
 	}
 
 	// Create an empty of above
-	var params User_details
+	var params LoginRequest
 	// Decode the inputed JSON response to the memory
 	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
 		// Deal with any JSON decoding errors
@@ -409,7 +411,16 @@ func (cfg *ApiConfig) login(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	
-}
+		var expiration time.Duration
+		if loginRequest.ExpiresInSeconds == nil {
+			expiration = time.Hour // Default to 1 hour if field is missing
+		} else if *loginRequest.ExpiresInSeconds > 3600 {
+			expiration = time.Hour // Cap at 1 hour if client requests more
+		} else {
+			expiration = time.Duration(*loginRequest.ExpiresInSeconds) * time.Second
+		}
+	
+	}
 	// Start by looking up a user in the DB by their email and return the hash?
 	dbUser, err := cfg.DBQueries.GetEmail(r.Context(), params.Email)
 	if err != nil {
