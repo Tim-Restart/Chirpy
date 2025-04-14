@@ -19,6 +19,7 @@ type ApiConfig struct {
 	fileserverHits atomic.Int32
 	DBQueries      *database.Queries
 	platform       string
+	jwtSecret 	   string
 }
 
 type User struct {
@@ -27,6 +28,7 @@ type User struct {
 	UpdatedAt time.Time `json:"updated_at"`
 	Email     string    `json:"email"`
 	Hashed_Password string `json:"hashed_password"`
+	Token string `json:"token"`
 }
 
 type Chirp struct {

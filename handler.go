@@ -411,16 +411,18 @@ func (cfg *ApiConfig) login(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	
-		var expiration time.Duration
-		if loginRequest.ExpiresInSeconds == nil {
+			
+	}
+
+	var expiration time.Duration
+		if params.ExpiresInSeconds == nil {
 			expiration = time.Hour // Default to 1 hour if field is missing
-		} else if *loginRequest.ExpiresInSeconds > 3600 {
+		} else if *params.ExpiresInSeconds > 3600 {
 			expiration = time.Hour // Cap at 1 hour if client requests more
 		} else {
-			expiration = time.Duration(*loginRequest.ExpiresInSeconds) * time.Second
+			expiration = time.Duration(*params.ExpiresInSeconds) * time.Second
 		}
-	
-	}
+		
 	// Start by looking up a user in the DB by their email and return the hash?
 	dbUser, err := cfg.DBQueries.GetEmail(r.Context(), params.Email)
 	if err != nil {
@@ -451,6 +453,7 @@ func (cfg *ApiConfig) login(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+
 	// Assign the user information to be returned on successful password
 	user := User{
 		ID:        dbUser.ID,
@@ -458,6 +461,16 @@ func (cfg *ApiConfig) login(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt: dbUser.UpdatedAt,
 		Email:     dbUser.Email,
 		}
+
+	// After validating user credentials
+	tokenString, err := auth.MakeJWT(user.ID, cfg.jwtSecret, expiration) // Use your expiration value here
+	if err != nil {
+		// Handle the error, perhaps return a 500
+		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+		return
+	}
+
+	user.Token = tokenString
 	
 	// Encode the response and return the results
 	err = respondWithJSON(w, 200, user)
