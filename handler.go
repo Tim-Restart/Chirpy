@@ -187,6 +187,20 @@ func (cfg *ApiConfig) newChirp(w http.ResponseWriter, r *http.Request) {
 		User_id string `json:"user_id"`
 	}
 
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		http.Error(w, "Unauthorized: Invalid or missing token", http.StatusUnauthorized)
+		return
+	}
+
+	userUUID, err := auth.ValidateJWT(token, cfg.jwtSecret)
+	if err != nil {
+		http.Error(w, "Unauthorized: Invalid or missing token", http.StatusUnauthorized)
+		return
+	}
+
+	
+
 	// Created an empty Chirp struct
 	var params Chirp_Input
 
@@ -235,26 +249,27 @@ func (cfg *ApiConfig) newChirp(w http.ResponseWriter, r *http.Request) {
 	cleanedBody := string(cleanedBodyBytes)
 	fmt.Printf(cleanedBody)
 
+	
 	// 4. Parse the User_id string into a UUID
-	userUUID, err := uuid.Parse(params.User_id)
-	if err != nil {
-		errResp := errorResponse{
-			Error: "Invalid user ID format",
-		}
+	//userUUID, err := uuid.Parse(userID)
+	//if err != nil {
+		//errResp := errorResponse{
+		//	Error: "Invalid user ID format",
+		//}
 
 
-		jsonResp, err := json.Marshal(errResp)
-		if err != nil {
-			log.Printf("Error marshalling JSON: %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
+		//jsonResp, err := json.Marshal(errResp)
+		//if err != nil {
+		//	log.Printf("Error marshalling JSON: %s", err)
+		//	w.WriteHeader(http.StatusInternalServerError)
+		//	return
+	//	}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write(jsonResp)
-		return
-	}
+	//	w.Header().Set("Content-Type", "application/json")
+	//	w.WriteHeader(http.StatusBadRequest)
+	//	w.Write(jsonResp)
+	//	return
+	//}
 
 	// Create the NewChirpParams struct
 	chirpParams := database.NewChirpParams{
@@ -422,7 +437,7 @@ func (cfg *ApiConfig) login(w http.ResponseWriter, r *http.Request) {
 		} else {
 			expiration = time.Duration(*params.ExpiresInSeconds) * time.Second
 		}
-		
+
 	// Start by looking up a user in the DB by their email and return the hash?
 	dbUser, err := cfg.DBQueries.GetEmail(r.Context(), params.Email)
 	if err != nil {
