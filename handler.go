@@ -249,28 +249,6 @@ func (cfg *ApiConfig) newChirp(w http.ResponseWriter, r *http.Request) {
 	cleanedBody := string(cleanedBodyBytes)
 	fmt.Printf(cleanedBody)
 
-	
-	// 4. Parse the User_id string into a UUID
-	//userUUID, err := uuid.Parse(userID)
-	//if err != nil {
-		//errResp := errorResponse{
-		//	Error: "Invalid user ID format",
-		//}
-
-
-		//jsonResp, err := json.Marshal(errResp)
-		//if err != nil {
-		//	log.Printf("Error marshalling JSON: %s", err)
-		//	w.WriteHeader(http.StatusInternalServerError)
-		//	return
-	//	}
-
-	//	w.Header().Set("Content-Type", "application/json")
-	//	w.WriteHeader(http.StatusBadRequest)
-	//	w.Write(jsonResp)
-	//	return
-	//}
-
 	// Create the NewChirpParams struct
 	chirpParams := database.NewChirpParams{
 		Body:   cleanedBody,
