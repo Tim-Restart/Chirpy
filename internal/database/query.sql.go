@@ -7,6 +7,8 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -118,6 +120,41 @@ func (q *Queries) GetEmail(ctx context.Context, email string) (User, error) {
 	return i, err
 }
 
+const getUserFromRefreshToken = `-- name: GetUserFromRefreshToken :many
+SELECT user_id, expires_at, revoked_at
+FROM refresh_tokens
+WHERE token = $1
+`
+
+type GetUserFromRefreshTokenRow struct {
+	UserID    uuid.UUID
+	ExpiresAt time.Time
+	RevokedAt sql.NullTime
+}
+
+func (q *Queries) GetUserFromRefreshToken(ctx context.Context, token string) ([]GetUserFromRefreshTokenRow, error) {
+	rows, err := q.db.QueryContext(ctx, getUserFromRefreshToken, token)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetUserFromRefreshTokenRow
+	for rows.Next() {
+		var i GetUserFromRefreshTokenRow
+		if err := rows.Scan(&i.UserID, &i.ExpiresAt, &i.RevokedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const newChirp = `-- name: NewChirp :one
 INSERT INTO chirps (id, created_at, updated_at, body, user_id)
 VALUES (
@@ -142,4 +179,45 @@ func (q *Queries) NewChirp(ctx context.Context, arg NewChirpParams) (Chirp, erro
 		&i.UserID,
 	)
 	return i, err
+}
+
+const refreshTokenExpiry = `-- name: RefreshTokenExpiry :one
+SELECT expires_at 
+FROM refresh_tokens
+WHERE user_id = $1
+`
+
+func (q *Queries) RefreshTokenExpiry(ctx context.Context, userID uuid.UUID) (time.Time, error) {
+	row := q.db.QueryRowContext(ctx, refreshTokenExpiry, userID)
+	var expires_at time.Time
+	err := row.Scan(&expires_at)
+	return expires_at, err
+}
+
+const revokeToken = `-- name: RevokeToken :exec
+UPDATE refresh_tokens
+SET updated_at = NOW(), revoked_at = NOW()
+WHERE token = $1
+`
+
+func (q *Queries) RevokeToken(ctx context.Context, token string) error {
+	_, err := q.db.ExecContext(ctx, revokeToken, token)
+	return err
+}
+
+const saveRefToken = `-- name: SaveRefToken :exec
+INSERT INTO refresh_tokens (token, created_at, updated_at, user_id, expires_at, revoked_at)
+VALUES (
+    $1, NOW(), NOW(), $2, NOW() + INTERVAL '60 days', NULL
+)
+`
+
+type SaveRefTokenParams struct {
+	Token  string
+	UserID uuid.UUID
+}
+
+func (q *Queries) SaveRefToken(ctx context.Context, arg SaveRefTokenParams) error {
+	_, err := q.db.ExecContext(ctx, saveRefToken, arg.Token, arg.UserID)
+	return err
 }

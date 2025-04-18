@@ -89,5 +89,21 @@ func respondWithJSON(w http.ResponseWriter, status int, data interface{}) error 
 	return nil
 }
 
+func respondWithError(w http.ResponseWriter, status int, message string) {
+    type errorResponse struct {
+        Error string `json:"error"`
+    }
+    
+    response := errorResponse{
+        Error: message,
+    }
+    
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(status)
+    json.NewEncoder(w).Encode(response)
+    // Note: We're not returning an error here since we can't do much with it anyway
+    // after we've already started writing the response
+}
+
 // Function to search via user email address
 

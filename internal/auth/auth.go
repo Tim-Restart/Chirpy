@@ -10,6 +10,10 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"crypto/rand"
+	"encoding/hex"
+	"github.com/Tim-Restart/chirpy/internal/database"
+	"context"
 )
 
 // Function to hash a given password and return the hash
@@ -103,6 +107,31 @@ func GetBearerToken(headers http.Header) (string, error) {
 
 	return token, nil
 
+}
+
+// Makes a refresh token
+func MakeRefreshToken() (string, error) {
+	key := make([]byte, 32) // Makes an empty byte slice to be filled by the rand.Read
+	
+	if _, err := rand.Read(key); err != nil {
+		return "", err
+	}
+	encodedKey := hex.EncodeToString(key)
+	return encodedKey, nil
+}
+
+func SaveRefreshToken(token string, userID uuid.UUID, dbQueries database.Queries) error {
+	ctx := context.Background()
+
+	params := database.SaveRefTokenParams{
+		Token:  token,
+		UserID: userID,
+	}
+	err := dbQueries.SaveRefToken(ctx, params)
+	if err != nil {
+		return err
+	}
 
 
+	return nil
 }

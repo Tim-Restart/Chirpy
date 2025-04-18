@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/Tim-Restart/chirpy/internal/auth"
 	"time"
+	"context"
 )
 
 
@@ -384,7 +385,7 @@ func (cfg *ApiConfig) login(w http.ResponseWriter, r *http.Request) {
 	type LoginRequest struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
-		ExpiresInSeconds *int    `json:"expires_in_seconds"`
+		//ExpiresInSeconds *int    `json:"expires_in_seconds"`
 	}
 
 	// Create an empty of above
@@ -399,7 +400,7 @@ func (cfg *ApiConfig) login(w http.ResponseWriter, r *http.Request) {
 		errJ := respondWithJSON(w, 500, errResp)
 		if errJ != nil {
 			// Handle JSON encoding error
-			http.Error(w, "Failed to encode JSON", http.StatusInternalServerError)
+			respondWithError(w, http.StatusInternalServerError, "Failed to encode JSON")
 			log.Printf("JSON encoding error: %s", err)
 			return
 		}
@@ -407,14 +408,8 @@ func (cfg *ApiConfig) login(w http.ResponseWriter, r *http.Request) {
 			
 	}
 
-	var expiration time.Duration
-		if params.ExpiresInSeconds == nil {
-			expiration = time.Hour // Default to 1 hour if field is missing
-		} else if *params.ExpiresInSeconds > 3600 {
-			expiration = time.Hour // Cap at 1 hour if client requests more
-		} else {
-			expiration = time.Duration(*params.ExpiresInSeconds) * time.Second
-		}
+	expiration := time.Hour
+	
 
 	// Start by looking up a user in the DB by their email and return the hash?
 	dbUser, err := cfg.DBQueries.GetEmail(r.Context(), params.Email)
@@ -424,7 +419,7 @@ func (cfg *ApiConfig) login(w http.ResponseWriter, r *http.Request) {
 		}
 		errJ := respondWithJSON(w, 401, errResp)
 		if errJ != nil {
-			http.Error(w, "Failed to encode JSON", http.StatusInternalServerError)
+			respondWithError(w, http.StatusInternalServerError, "Failed to encode JSON")
 			log.Printf("JSON encoding error: %s", errJ)
 		}
 		return
@@ -440,7 +435,7 @@ func (cfg *ApiConfig) login(w http.ResponseWriter, r *http.Request) {
 		errJ := respondWithJSON(w, 401, errResp)
 		if errJ != nil {
 			// Handle JSON encoding error
-			http.Error(w, "Failed to encode JSON", http.StatusInternalServerError)
+			respondWithError(w, http.StatusInternalServerError, "Failed to encode JSON")
 			log.Printf("JSON encoding error: %s", err)
 			return
 		}
@@ -459,22 +454,95 @@ func (cfg *ApiConfig) login(w http.ResponseWriter, r *http.Request) {
 	tokenString, err := auth.MakeJWT(user.ID, cfg.jwtSecret, expiration) // Use your expiration value here
 	if err != nil {
 		// Handle the error, perhaps return a 500
-		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+		respondWithError(w, http.StatusInternalServerError, "Failed to generate token")
 		return
 	}
 
 	user.Token = tokenString
+
+	user.Refresh_Token, err = auth.MakeRefreshToken() // return the refresh_token here
+	err = auth.SaveRefreshToken(user.Refresh_Token, dbUser.ID, *cfg.DBQueries)
+	if err != nil {
+		log.Print("Error saving refresh token")
+		return
+	}
 	
 	// Encode the response and return the results
 	err = respondWithJSON(w, 200, user)
 	if err != nil {
 		// Handle JSON encoding error
-		http.Error(w, "Failed to encode JSON", http.StatusInternalServerError)
+		respondWithError(w, http.StatusInternalServerError, "Failed to encode JSON")
 		log.Printf("JSON encoding error: %s", err)
 		return
 	}
 	
 }
 
+// requires a refresh token to be present in the headers
+func (cfg *ApiConfig) refresh(w http.ResponseWriter, r *http.Request) {
+	token, _ := auth.GetBearerToken(r.Header)
+	if token == "" {
+		respondWithError(w, http.StatusUnauthorized, "No token provided")
+		return
+	}
 
+	// Get user info from the refresh token
+	rows, err := cfg.DBQueries.GetUserFromRefreshToken(r.Context(), token)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Invalid token")
+		return
+	}
+	
+	// Check if we got any results
+	if len(rows) == 0 {
+		respondWithError(w, http.StatusUnauthorized, "Invalid token")
+		return
+	}
+	
+	// Use the first row (assuming tokens are unique)
+	tokenInfo := rows[0]
+	
+	// Checks if the token has been revoked
+	if tokenInfo.RevokedAt.Valid {
+		respondWithError(w, http.StatusUnauthorized, "Token revoked")
+		return
+	} 
 
+	// Check if the token has expired
+	if time.Now().After(tokenInfo.ExpiresAt) {
+		respondWithError(w, http.StatusUnauthorized, "Token expired")
+		return
+	}
+
+	// Generate a new access token for the user
+	accessToken, err := auth.MakeJWT(tokenInfo.UserID, cfg.jwtSecret, time.Hour)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't create token")
+		return
+	}
+	
+	// Respond with the new access token
+	respondWithJSON(w, http.StatusOK, map[string]string{
+		"token": accessToken,
+	})
+	}
+
+func (cfg *ApiConfig) revoke(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+	// Get the token
+	token, _ := auth.GetBearerToken(r.Header)
+	if token == "" {
+		respondWithError(w, http.StatusUnauthorized, "No token provided")
+		return
+	}
+
+	err := cfg.DBQueries.RevokeToken(ctx, token)
+	if err != nil {
+        respondWithError(w, http.StatusInternalServerError, "Couldn't revoke token")
+        return
+    }
+
+	// Set the status code to 204 No Content
+	w.WriteHeader(http.StatusNoContent)
+	// No need to write any body for 204
+}

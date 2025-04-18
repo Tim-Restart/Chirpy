@@ -29,6 +29,7 @@ type User struct {
 	Email     string    `json:"email"`
 	Hashed_Password string `json:"hashed_password"`
 	Token string `json:"token"`
+	Refresh_Token string `json:"refresh_token"`
 }
 
 type Chirp struct {
@@ -191,6 +192,12 @@ func main() {
 
 	// Resets the server metrics
 	mux.HandleFunc("POST /admin/reset", cfg.metricsResetHandler)
+
+	// Checks to make sure the refresh token is valid
+	mux.HandleFunc("POST /api/refresh", cfg.refresh)
+
+	// Revokes the refresh token
+	mux.HandleFunc("POST /api/revoke", cfg.revoke)
 
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
 		// Set the content type header
