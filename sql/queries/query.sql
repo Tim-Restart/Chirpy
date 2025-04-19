@@ -49,3 +49,18 @@ WHERE token = $1;
 UPDATE refresh_tokens
 SET updated_at = NOW(), revoked_at = NOW()
 WHERE token = $1;
+
+-- name: UpdateUser :exec
+UPDATE users
+SET email = $2, hashed_password = $3, updated_at = NOW()
+WHERE id = $1;
+
+-- name: UserFromToken :one
+SELECT user_id
+FROM refresh_tokens
+WHERE token = $1;
+
+-- name: GetUserEmail :one
+SELECT email
+FROM users
+WHERE id = $1;

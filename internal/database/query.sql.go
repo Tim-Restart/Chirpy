@@ -120,6 +120,19 @@ func (q *Queries) GetEmail(ctx context.Context, email string) (User, error) {
 	return i, err
 }
 
+const getUserEmail = `-- name: GetUserEmail :one
+SELECT email
+FROM users
+WHERE id = $1
+`
+
+func (q *Queries) GetUserEmail(ctx context.Context, id uuid.UUID) (string, error) {
+	row := q.db.QueryRowContext(ctx, getUserEmail, id)
+	var email string
+	err := row.Scan(&email)
+	return email, err
+}
+
 const getUserFromRefreshToken = `-- name: GetUserFromRefreshToken :many
 SELECT user_id, expires_at, revoked_at
 FROM refresh_tokens
@@ -220,4 +233,34 @@ type SaveRefTokenParams struct {
 func (q *Queries) SaveRefToken(ctx context.Context, arg SaveRefTokenParams) error {
 	_, err := q.db.ExecContext(ctx, saveRefToken, arg.Token, arg.UserID)
 	return err
+}
+
+const updateUser = `-- name: UpdateUser :exec
+UPDATE users
+SET email = $2, hashed_password = $3, updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateUserParams struct {
+	ID             uuid.UUID
+	Email          string
+	HashedPassword string
+}
+
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
+	_, err := q.db.ExecContext(ctx, updateUser, arg.ID, arg.Email, arg.HashedPassword)
+	return err
+}
+
+const userFromToken = `-- name: UserFromToken :one
+SELECT user_id
+FROM refresh_tokens
+WHERE token = $1
+`
+
+func (q *Queries) UserFromToken(ctx context.Context, token string) (uuid.UUID, error) {
+	row := q.db.QueryRowContext(ctx, userFromToken, token)
+	var user_id uuid.UUID
+	err := row.Scan(&user_id)
+	return user_id, err
 }

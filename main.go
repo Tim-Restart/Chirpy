@@ -199,6 +199,9 @@ func main() {
 	// Revokes the refresh token
 	mux.HandleFunc("POST /api/revoke", cfg.revoke)
 
+	// Updates the email and password
+	mux.HandleFunc("PUT /api/users", cfg.updateUser)
+
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
 		// Set the content type header
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")

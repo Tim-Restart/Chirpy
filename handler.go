@@ -546,3 +546,82 @@ func (cfg *ApiConfig) revoke(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 	// No need to write any body for 204
 }
+
+// Updates user email and password
+func (cfg *ApiConfig) updateUser(w http.ResponseWriter, r *http.Request) {
+	// Assign context
+	ctx := context.Background()
+
+	// Define struct to take decoded body
+	type UpdateRequest struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+		}
+
+
+	// Get token
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "No token found")
+		return
+	}
+
+	// Need to get original email here, then compare it to the Request Email, if differnet
+	userID, err := cfg.DBQueries.UserFromToken(ctx, token)
+		if err != nil {
+			respondWithError(w, http.StatusUnauthorized, "Unable to get user details")
+		}
+	
+
+	
+
+	// Create an empty of above
+	var params UpdateRequest
+
+	// Decode the inputed JSON response to the memory
+	if err = json.NewDecoder(r.Body).Decode(&params); err != nil {
+		// Deal with any JSON decoding errors
+		respondWithError(w, http.StatusInternalServerError, "Unable to decode details")
+	}
+		
+	// take email and put it in variable to pass in
+	newEmail := params.Email
+	newPassword, err := auth.HashPassword(params.Password) 
+	if err != nil {
+		// Prints the error to the terminal
+		log.Println("Error hashing password")
+		respondWithError(w, http.StatusInternalServerError, "Unable to update password")
+	}
+
+
+
+	updateParams :=  database.UpdateUserParams {
+		ID:        userID,
+		Email:     newEmail,
+		HashedPassword: newPassword,
+	}
+
+	// pass in details to cfg.DBqueries.UpdateUser ($1 user,$2 email,$3 hashedPW)
+	err = cfg.DBQueries.UpdateUser(ctx, updateParams)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Unable to update user details")
+	}
+
+	//Struct for the JSON response ommitting the password hash
+	userReturn := User{
+		ID:        userID,
+		Email:     newEmail,
+	}
+
+	err = respondWithJSON(w, 200, userReturn)
+	if err != nil {
+		// Handle JSON encoding error
+		respondWithError(w, http.StatusInternalServerError, "Failed to encode JSON")
+		log.Printf("JSON encoding error: %s", err)
+		return
+	}
+
+}
+
+
+
