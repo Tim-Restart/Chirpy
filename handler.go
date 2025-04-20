@@ -567,9 +567,10 @@ func (cfg *ApiConfig) updateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Need to get original email here, then compare it to the Request Email, if differnet
-	userID, err := cfg.DBQueries.UserFromToken(ctx, token)
+	userID, err := auth.ValidateJWT(token, cfg.jwtSecret)
 		if err != nil {
 			respondWithError(w, http.StatusUnauthorized, "Unable to get user details")
+			return
 		}
 	
 
@@ -582,6 +583,7 @@ func (cfg *ApiConfig) updateUser(w http.ResponseWriter, r *http.Request) {
 	if err = json.NewDecoder(r.Body).Decode(&params); err != nil {
 		// Deal with any JSON decoding errors
 		respondWithError(w, http.StatusInternalServerError, "Unable to decode details")
+		return
 	}
 		
 	// take email and put it in variable to pass in
@@ -591,6 +593,7 @@ func (cfg *ApiConfig) updateUser(w http.ResponseWriter, r *http.Request) {
 		// Prints the error to the terminal
 		log.Println("Error hashing password")
 		respondWithError(w, http.StatusInternalServerError, "Unable to update password")
+		return
 	}
 
 
@@ -605,6 +608,7 @@ func (cfg *ApiConfig) updateUser(w http.ResponseWriter, r *http.Request) {
 	err = cfg.DBQueries.UpdateUser(ctx, updateParams)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Unable to update user details")
+		return
 	}
 
 	//Struct for the JSON response ommitting the password hash
