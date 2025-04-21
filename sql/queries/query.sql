@@ -64,3 +64,28 @@ WHERE token = $1;
 SELECT email
 FROM users
 WHERE id = $1;
+
+-- name: GetUserOfChirp :one
+SELECT user_id
+FROM chirps
+WHERE id = $1;
+
+-- name: DeleteChirp :exec
+DELETE FROM chirps
+WHERE id = $1;
+
+-- name: UpgradeToRed :exec
+UPDATE users
+SET is_chirpy_red = true
+WHERE id = $1;
+
+-- name: CheckUser :one
+SELECT id
+FROM users
+WHERE id = $1;
+
+-- name: IsChirpyRed :one
+SELECT is_chirpy_red
+FROM users
+WHERE id = $1;
+

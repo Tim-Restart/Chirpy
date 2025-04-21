@@ -13,12 +13,24 @@ import (
 	"github.com/google/uuid"
 )
 
+const checkUser = `-- name: CheckUser :one
+SELECT id
+FROM users
+WHERE id = $1
+`
+
+func (q *Queries) CheckUser(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRowContext(ctx, checkUser, id)
+	err := row.Scan(&id)
+	return id, err
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (id, created_at, updated_at, email, hashed_password)
 VALUES (
     gen_random_uuid(), NOW(), NOW(), $1, $2
 )
-RETURNING id, created_at, updated_at, email, hashed_password
+RETURNING id, created_at, updated_at, email, hashed_password, is_chirpy_red
 `
 
 type CreateUserParams struct {
@@ -35,6 +47,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.UpdatedAt,
 		&i.Email,
 		&i.HashedPassword,
+		&i.IsChirpyRed,
 	)
 	return i, err
 }
@@ -45,6 +58,16 @@ DELETE FROM users
 
 func (q *Queries) DeleteAllUsers(ctx context.Context) error {
 	_, err := q.db.ExecContext(ctx, deleteAllUsers)
+	return err
+}
+
+const deleteChirp = `-- name: DeleteChirp :exec
+DELETE FROM chirps
+WHERE id = $1
+`
+
+func (q *Queries) DeleteChirp(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, deleteChirp, id)
 	return err
 }
 
@@ -102,7 +125,7 @@ func (q *Queries) GetChirps(ctx context.Context) ([]Chirp, error) {
 }
 
 const getEmail = `-- name: GetEmail :one
-SELECT id, created_at, updated_at, email, hashed_password
+SELECT id, created_at, updated_at, email, hashed_password, is_chirpy_red
 FROM users
 WHERE email = $1
 `
@@ -116,6 +139,7 @@ func (q *Queries) GetEmail(ctx context.Context, email string) (User, error) {
 		&i.UpdatedAt,
 		&i.Email,
 		&i.HashedPassword,
+		&i.IsChirpyRed,
 	)
 	return i, err
 }
@@ -166,6 +190,32 @@ func (q *Queries) GetUserFromRefreshToken(ctx context.Context, token string) ([]
 		return nil, err
 	}
 	return items, nil
+}
+
+const getUserOfChirp = `-- name: GetUserOfChirp :one
+SELECT user_id
+FROM chirps
+WHERE id = $1
+`
+
+func (q *Queries) GetUserOfChirp(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRowContext(ctx, getUserOfChirp, id)
+	var user_id uuid.UUID
+	err := row.Scan(&user_id)
+	return user_id, err
+}
+
+const isChirpyRed = `-- name: IsChirpyRed :one
+SELECT is_chirpy_red
+FROM users
+WHERE id = $1
+`
+
+func (q *Queries) IsChirpyRed(ctx context.Context, id uuid.UUID) (sql.NullBool, error) {
+	row := q.db.QueryRowContext(ctx, isChirpyRed, id)
+	var is_chirpy_red sql.NullBool
+	err := row.Scan(&is_chirpy_red)
+	return is_chirpy_red, err
 }
 
 const newChirp = `-- name: NewChirp :one
@@ -249,6 +299,17 @@ type UpdateUserParams struct {
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
 	_, err := q.db.ExecContext(ctx, updateUser, arg.ID, arg.Email, arg.HashedPassword)
+	return err
+}
+
+const upgradeToRed = `-- name: UpgradeToRed :exec
+UPDATE users
+SET is_chirpy_red = true
+WHERE id = $1
+`
+
+func (q *Queries) UpgradeToRed(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, upgradeToRed, id)
 	return err
 }
 

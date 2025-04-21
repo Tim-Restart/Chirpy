@@ -87,6 +87,8 @@ func (cfg *ApiConfig) metricsResetHandler(w http.ResponseWriter, r *http.Request
 
 func (cfg *ApiConfig) addUser(w http.ResponseWriter, r *http.Request) {
 
+	ctx := r.Context()
+
 	type createUserRequest struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
@@ -158,6 +160,14 @@ func (cfg *ApiConfig) addUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	chirpyRed, err := cfg.DBQueries.IsChirpyRed(ctx, dbUser.ID)
+	if err != nil {
+		log.Printf("Error getting user Red stauts: %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+
 	
 	// Do not include a password hash or field here!
 	user := User{
@@ -165,6 +175,7 @@ func (cfg *ApiConfig) addUser(w http.ResponseWriter, r *http.Request) {
 		CreatedAt: dbUser.CreatedAt,
 		UpdatedAt: dbUser.UpdatedAt,
 		Email:     dbUser.Email,
+		IsChirpyRed: chirpyRed.Valid && chirpyRed.Bool,
 		}
 
 	userJSON, err := json.Marshal(user)
@@ -275,6 +286,7 @@ func (cfg *ApiConfig) newChirp(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	
 
 	new_Chirp := Chirp{
 		ID:        dbChirp.ID,
@@ -334,6 +346,7 @@ func (cfg *ApiConfig) getChirp(w http.ResponseWriter, r *http.Request) {
 	idString := r.PathValue("chirpID")
 	chirpToGet, err:= uuid.Parse(idString)
 	if err != nil {
+		
 		errResp := errorResponse{
 			Error: "Invalid Chirp ID format",
 		}
@@ -346,6 +359,12 @@ func (cfg *ApiConfig) getChirp(w http.ResponseWriter, r *http.Request) {
 
 	dbChirp, err := cfg.DBQueries.GetChirp(r.Context(), chirpToGet)
 	if err != nil {
+
+		if err.Error() == "sql: no rows in result set" {
+			// Chirp not found, return 404
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
 		log.Printf("Error finding chirp in database: %v", err)
 
 		errResp := errorResponse{
@@ -381,6 +400,8 @@ func (cfg *ApiConfig) getChirp(w http.ResponseWriter, r *http.Request) {
 
 func (cfg *ApiConfig) login(w http.ResponseWriter, r *http.Request) {
 
+	ctx := r.Context()
+
 	// Define a struct to take the JSON input
 	type LoginRequest struct {
 		Email    string `json:"email"`
@@ -412,7 +433,7 @@ func (cfg *ApiConfig) login(w http.ResponseWriter, r *http.Request) {
 	
 
 	// Start by looking up a user in the DB by their email and return the hash?
-	dbUser, err := cfg.DBQueries.GetEmail(r.Context(), params.Email)
+	dbUser, err := cfg.DBQueries.GetEmail(ctx, params.Email)
 	if err != nil {
 		errResp := errorResponse{
 			Error: "Incorrect email or password",
@@ -441,6 +462,13 @@ func (cfg *ApiConfig) login(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	chirpyRed, err := cfg.DBQueries.IsChirpyRed(ctx, dbUser.ID)
+	if err != nil {
+		log.Printf("Error getting user Red stauts: %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 
 	// Assign the user information to be returned on successful password
 	user := User{
@@ -448,6 +476,7 @@ func (cfg *ApiConfig) login(w http.ResponseWriter, r *http.Request) {
 		CreatedAt: dbUser.CreatedAt,
 		UpdatedAt: dbUser.UpdatedAt,
 		Email:     dbUser.Email,
+		IsChirpyRed: chirpyRed.Valid && chirpyRed.Bool,
 		}
 
 	// After validating user credentials
@@ -624,6 +653,122 @@ func (cfg *ApiConfig) updateUser(w http.ResponseWriter, r *http.Request) {
 		log.Printf("JSON encoding error: %s", err)
 		return
 	}
+
+}
+	// Deletes a chirp if the user is correct and Chirp ID provided
+func (cfg *ApiConfig) deleteChirp(w http.ResponseWriter, r *http.Request) {
+
+	ctx := context.Background()
+
+	// Chirp ID comes from response body .id  - this retrieves it from the request and parses to UUID
+	idString := r.PathValue("chirpID")
+	chirpID, err:= uuid.Parse(idString)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to decode ChirpID")
+		return
+	}
+
+	
+	// Get the token first using JWT
+	// Get token
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "No token found")
+		return
+	}
+
+	// Need to get original email here, then compare it to the Request Email, if differnet
+	userID, err := auth.ValidateJWT(token, cfg.jwtSecret)
+		if err != nil {
+			respondWithError(w, http.StatusUnauthorized, "Unable to get user details")
+			return
+		}
+	
+	// Get UserID of chirp creator
+	chirpUser, err := cfg.DBQueries.GetUserOfChirp(ctx, chirpID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to decode ChirpID user")
+		return
+	}
+
+	// Verify token UserID v Chirp UserID
+	if chirpUser != userID {
+		respondWithError(w, http.StatusForbidden, "Action not authorised")
+		return
+	}
+	// send delete request to db
+
+	err = cfg.DBQueries.DeleteChirp(ctx, chirpID) 
+	if err != nil {
+		respondWithError(w, http.StatusForbidden, "Action not authorised")
+		return
+	}
+
+	//err = respondWithJSON(w, 204, "")
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusNoContent)
+	w.Write([]byte("Chirp Deleted\n"))
+
+}
+
+
+// Accepts a notification from POLKA that payment has been made for Chirpy Red
+func (cfg *ApiConfig) chirpyRedUpgrade(w http.ResponseWriter, r *http.Request) {
+	
+	ctx := r.Context()
+
+	// Struct to take the Request body
+	type UserData struct {
+		UserID		string `json:"user_id"`
+	}
+
+	type webhookReturn struct {
+		Event		string `json:"event"`
+		Data		UserData `json:"data"`
+	}
+
+	// Decode the user data
+
+	var params webhookReturn
+
+	// Decode the inputed JSON response to the memory
+	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+		// Deal with any JSON decoding errors
+		respondWithError(w, http.StatusInternalServerError, "Unable to decode details")
+		return
+	}
+
+	if params.Event != "user.upgraded" {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	userID, err := uuid.Parse(params.Data.UserID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "UserID not parsed correctly")
+		return
+	}
+
+	// Check if user exists
+	_, err = cfg.DBQueries.CheckUser(ctx, userID) 
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusNoContent)
+		return
+
+	}
+	
+
+	err = cfg.DBQueries.UpgradeToRed(ctx, userID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Unable to upgrade to red")
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusNoContent)
+	return
 
 }
 

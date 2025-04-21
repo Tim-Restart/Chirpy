@@ -1,7 +1,7 @@
 version: "2"
 sql:
-  - schema: "sql/schema"
-    queries: "sql/queries"
+  - schema: "sql/schema/schema.sql"    # Include all migration files for schema
+    queries: "sql/queries/*.sql"  # Include all query files for sqlc to parse
     engine: "postgresql"
     gen:
       go:

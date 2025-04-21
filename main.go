@@ -30,6 +30,7 @@ type User struct {
 	Hashed_Password string `json:"hashed_password"`
 	Token string `json:"token"`
 	Refresh_Token string `json:"refresh_token"`
+	IsChirpyRed bool `json:"is_chirpy_red"`
 }
 
 type Chirp struct {
@@ -201,6 +202,12 @@ func main() {
 
 	// Updates the email and password
 	mux.HandleFunc("PUT /api/users", cfg.updateUser)
+
+	//Delete functionality
+	mux.HandleFunc("DELETE /api/chirps/{chirpID}", cfg.deleteChirp)
+
+	// Upgrade to Chirpy Red! 
+	mux.HandleFunc("POST /api/polka/webhooks", cfg.chirpyRedUpgrade)
 
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
 		// Set the content type header
