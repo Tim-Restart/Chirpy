@@ -60,3 +60,4 @@ func TestGetBearerToken(t *testing.T) {
 	log.Printf("Returned Token: %v", tokenReturned)
 	log.Printf("Token should be: %v", token)
 }
+

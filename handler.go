@@ -715,6 +715,18 @@ func (cfg *ApiConfig) deleteChirp(w http.ResponseWriter, r *http.Request) {
 // Accepts a notification from POLKA that payment has been made for Chirpy Red
 func (cfg *ApiConfig) chirpyRedUpgrade(w http.ResponseWriter, r *http.Request) {
 	
+	// Check the API key here
+	checkKey, err := GetAPIKey(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	if checkKey != cfg.polka {
+		respondWithError(w, http.StatusUnauthorized, "Incorrect Key")
+		return
+	}
+
 	ctx := r.Context()
 
 	// Struct to take the Request body
@@ -734,7 +746,7 @@ func (cfg *ApiConfig) chirpyRedUpgrade(w http.ResponseWriter, r *http.Request) {
 	// Decode the inputed JSON response to the memory
 	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
 		// Deal with any JSON decoding errors
-		respondWithError(w, http.StatusInternalServerError, "Unable to decode details")
+		respondWithError(w, http.StatusUnauthorized, "Unable to decode details")
 		return
 	}
 

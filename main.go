@@ -20,6 +20,7 @@ type ApiConfig struct {
 	DBQueries      *database.Queries
 	platform       string
 	jwtSecret 	   string
+	polka 		   string
 }
 
 type User struct {
@@ -86,6 +87,11 @@ func main() {
 		panic("SECRET is not set in the enviroment, check .env file")
 	}
 
+	polkaKey := os.Getenv("POLKA_KEY")
+	if polkaKey == "" {
+		panic("Polka key is not set in the enviroment")
+	}
+
 	// Create a new instance of *database.Queries
 	dbQueries := database.New(db)
 
@@ -94,6 +100,7 @@ func main() {
 	cfg := ApiConfig{
 		DBQueries: dbQueries,
 		platform:  platform,
+		polka: polkaKey,
 	}
 
 	// Make a new server

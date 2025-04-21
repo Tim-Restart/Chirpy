@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"errors"
 )
 
 func badWordReplacement(chirpy string) string {
@@ -105,5 +106,30 @@ func respondWithError(w http.ResponseWriter, status int, message string) {
     // after we've already started writing the response
 }
 
-// Function to search via user email address
+// Function to get API key from header
+
+func GetAPIKey(headers http.Header) (string, error) {
+	
+	// Gets the bearer token and does stuff with it
+	authHeader := headers.Get("Authorization")
+	
+	if authHeader == "" {
+		log.Print("Error: Authorization header is empty")
+		return "", errors.New("authorization header is missing")
+	}
+	
+	if !strings.HasPrefix(authHeader, "ApiKey ") {
+		log.Print("Error: Authorization header does not start with 'ApiKey '")
+		return "", errors.New("invalid authorization header format")
+	}
+
+	polkaKey := strings.TrimPrefix(authHeader, "ApiKey ")
+
+	if strings.TrimSpace(polkaKey) == "" {
+		log.Print("Error: Key is empty after trimming")
+		return "", errors.New("authorization token is empty")
+	}
+
+	return polkaKey, nil
+}
 
