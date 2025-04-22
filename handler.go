@@ -10,6 +10,7 @@ import (
 	"github.com/Tim-Restart/chirpy/internal/auth"
 	"time"
 	"context"
+	"sort"
 )
 
 
@@ -383,6 +384,22 @@ func (cfg *ApiConfig) handleGetChirps(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Database error: %s", err)
 		return
 	}
+
+	// Check if there is a 
+	sorted := r.URL.Query().Get("sort")
+
+	if sorted == "desc" {
+		sort.Slice(chirps, func(i, j int) bool { 
+			return chirps[i].CreatedAt.After(chirps[j].CreatedAt)
+		})
+	} else {
+		// Default to ascending order
+		sort.Slice(chirps, func(i, j int) bool { 
+			return chirps[i].CreatedAt.Before(chirps[j].CreatedAt)
+		})
+	}
+		
+
 
 	// Trying out the respondWithJSON helper
 
