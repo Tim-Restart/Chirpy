@@ -89,3 +89,8 @@ SELECT is_chirpy_red
 FROM users
 WHERE id = $1;
 
+-- name: ChirpsFrom :many
+SELECT body 
+FROM chirps
+WHERE user_id = $1
+ORDER BY created_at ASC;

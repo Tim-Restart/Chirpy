@@ -25,6 +25,36 @@ func (q *Queries) CheckUser(ctx context.Context, id uuid.UUID) (uuid.UUID, error
 	return id, err
 }
 
+const chirpsFrom = `-- name: ChirpsFrom :many
+SELECT body 
+FROM chirps
+WHERE user_id = $1
+ORDER BY created_at ASC
+`
+
+func (q *Queries) ChirpsFrom(ctx context.Context, userID uuid.UUID) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, chirpsFrom, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var body string
+		if err := rows.Scan(&body); err != nil {
+			return nil, err
+		}
+		items = append(items, body)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (id, created_at, updated_at, email, hashed_password)
 VALUES (

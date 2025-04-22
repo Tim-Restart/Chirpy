@@ -315,6 +315,66 @@ func (cfg *ApiConfig) handleGetChirps(w http.ResponseWriter, r *http.Request) {
 	// Use the request's context for the query
 	ctx := r.Context()
 
+	// See if there is an author ID in the query
+	// if so, call the function to get only all the chirps form that author
+	s := r.URL.Query().Get("author_id")
+
+	if s != "" {
+		// Encode the authorID into a UUID
+		author, err := uuid.Parse(s)
+		if err != nil {
+			errResp := errorResponse{
+			Error: "Invalid Chirp ID format",
+		}
+		http.Error(w, "Failed to encode UUID for chirp", http.StatusInternalServerError)
+		log.Printf("JSON encoding error: %s", errResp)
+		return
+		}
+
+
+		// get the chirps from the author and decode into dbCHirp
+		dbChirp, err := cfg.DBQueries.ChirpsFrom(ctx, author)
+		if err != nil {
+
+			if err.Error() == "sql: no rows in result set" {
+				// Chirp not found, return 404
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			log.Printf("Error finding chirp in database: %v", err)
+
+			errResp := errorResponse{
+				Error: "Error finding chirp: " + err.Error(),
+			}
+
+			err = respondWithJSON(w, 500, errResp)
+			if err != nil {
+				// Handle JSON encoding error
+				http.Error(w, "Failed to encode chirps", http.StatusInternalServerError)
+				log.Printf("JSON encoding error: %s", err)
+				return
+			}
+		}
+		// Struct to hold the body of the authors chirps
+		var selectedChirps []Chirp
+		for _, body := range dbChirp {
+   			selectedChirps = append(selectedChirps, Chirp{
+        	Body: body,
+      
+    	})
+}
+
+		// Respond with above
+		err = respondWithJSON(w, http.StatusOK, selectedChirps)
+		if err != nil {
+		// Handle JSON encoding error
+			http.Error(w, "Failed to encode chirps", http.StatusInternalServerError)
+			log.Printf("JSON encoding error: %s", err)
+			return
+	}
+		return
+	}
+
 	// Call the GetChirps function to fetch chirps from the database
 	chirps, err := cfg.getChirps(ctx)
 	if err != nil {
